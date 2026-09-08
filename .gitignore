@@ -1,0 +1,21 @@
+# Build output
+src/palera1n
+src/obj/
+src/gen/*.c
+src/gen/*.o
+src/resources/*
+!src/resources/.gitignore
+src/tools/obj/
+src/tools/gen/
+src/tools/checkra1npatcher
+src/helper/*.o
+src/helper/*.dylib
+
+# Downloaded dependency tree (keep its placeholder)
+dep_root/*
+!dep_root/.keep
+
+# Local/editor files
+.DS_Store
+.vscode/
+.idea/
