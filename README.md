@@ -38,7 +38,7 @@ Install the host tools and libraries with Homebrew:
 
 ```sh
 brew install make pkg-config libusb libimobiledevice libirecovery libusbmuxd \
-  libimobiledevice-glue libplist mbedtls readline xz xxd
+  libimobiledevice-glue libplist mbedtls readline xz vim
 ```
 
 This project uses GNU Make syntax. Homebrew installs it as `gmake` on macOS;

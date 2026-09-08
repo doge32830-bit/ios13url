@@ -14,7 +14,7 @@ fi
 
 echo "[+] Installing build dependencies..."
 brew install make pkg-config libusb libimobiledevice libirecovery libusbmuxd \
-    libimobiledevice-glue libplist mbedtls readline xz xxd
+    libimobiledevice-glue libplist mbedtls readline xz vim
 
 if command -v gmake >/dev/null 2>&1; then
     MAKE=gmake

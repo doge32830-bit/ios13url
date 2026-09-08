@@ -159,7 +159,7 @@ check-deps:
 	fi; \
 	if [ -n "$$missing" ]; then \
 		echo "error: missing build dependencies:$$missing" >&2; \
-		if [ "$(TARGET_OS)" = "Darwin" ]; then echo "Install them with: brew install make pkg-config libusb libimobiledevice libirecovery libusbmuxd libimobiledevice-glue libplist mbedtls readline xz xxd" >&2; fi; \
+		if [ "$(TARGET_OS)" = "Darwin" ]; then echo "Install them with: brew install make pkg-config libusb libimobiledevice libirecovery libusbmuxd libimobiledevice-glue libplist mbedtls readline xz vim" >&2; fi; \
 		exit 1; \
 	fi
 
