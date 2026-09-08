@@ -1,81 +1,111 @@
-# iOS URL Scheme Launcher
+# palera1n for usbliter8
 
-A static website for launching iOS apps via URL schemes directly from Safari on your iPhone. Specifically tuned for **iOS 13** compatibility.
+A macOS/Linux host port of palera1n with a libusb transport for devices that
+have already been placed in **usbliter8 pwned DFU**. It is based on the
+requested `mrstickman3/palera1n-for-usbliter8` repository, with the broken
+Intel-macOS build and device routing repaired.
 
-## Live demo
+> **Important:** a normal Mac or PC cannot run the usbliter8 SecureROM
+> exploit. The exploit requires compatible RP2350 hardware and a Lightning to
+> USB-A connection. This program runs after that hardware has produced the
+> `PWND:[usbliter8]` DFU marker.
 
-Host on GitHub Pages and open on your iPhone in Safari.
+## Supported usbliter8 CPIDs
 
-## Features
+The host transport recognizes every CPID with an implementation in the
+upstream usbliter8 project:
 
-- 300+ URL schemes across 20+ categories
-- Hidden/private Apple system app schemes (marked with red dot)
-- Deep-link schemes with paths/parameters (marked with blue dot)
-- Search and filter by category
-- Custom scheme input
-- iOS 13–optimised launch technique (hidden iframe + timed `window.location`)
+| CPID | SoC | Examples |
+| --- | --- | --- |
+| `0x8006` | S4/S5 | Apple Watch Series 4/5, first-generation Watch SE, HomePod mini |
+| `0x8020` | A12 | iPhone XS/XR, iPad Air 3, iPad mini 5, iPad 8, Apple TV 4K (2nd gen) |
+| `0x8030` | A13 | iPhone 11 family, iPhone SE (2nd gen), iPad 9, Studio Display |
 
-## How iOS 13 launching works
+A12X/Z (`0x8027`) is deliberately reported as not implemented: the upstream
+usbliter8 exploit does not provide an A12X/Z implementation, and pretending
+that it is supported can leave a device in an unusable state. The transport
+also refuses ordinary and checkm8-pwned DFU devices unless the serial string
+contains the exact `PWND:[usbliter8]` marker.
 
-iOS 13 requires URL scheme navigation to happen within the **user-gesture propagation window** (~1 second after a tap). This site uses two parallel techniques:
+The post-exploitation palera1n pipeline is intended for iPhone, iPad, and
+Apple TV devices. Apple Watch, HomePod, and Studio Display are listed because
+their SoCs are affected by usbliter8, but they are not claimed to be
+jailbreakable by palera1n.
 
-1. **Hidden iframe** — sets `iframe.src = scheme` silently, no address bar flicker
-2. **Timed window.location** — `window.location.href = scheme` inside `setTimeout(fn, 25)` to avoid same-tick sandboxing quirks while staying within the gesture window
+## Intel Mac build
 
-Both fire from the same tap event, maximising the chance at least one succeeds.
+Install the host tools and libraries with Homebrew:
 
-## Hosting on GitHub Pages
-
-1. Fork or clone this repo
-2. Go to **Settings → Pages**
-3. Set source to **main branch / root**
-4. Visit `https://yourusername.github.io/ios-scheme-launcher/` on your iPhone
-
-## URL scheme categories
-
-| Category | Description |
-|---|---|
-| Apple Hidden | Private/internal Apple system app schemes (may require specific iOS versions) |
-| Phone & FaceTime | `tel://`, `facetime://`, etc. |
-| Settings | `prefs:root=*` deep links into Settings |
-| Shortcuts & Automation | `shortcuts://`, `workflow://`, launch apps |
-| Social Media | Twitter, Instagram, WhatsApp, etc. |
-| Productivity | Notes apps, task managers, text editors |
-| ...and more | Music, Video, Maps, Cloud, Finance, etc. |
-
-## Legend
-
-- 🔴 Red dot = hidden/private Apple system app (may not work on all devices)
-- 🔵 Blue dot = deep link with path or parameters
-- 🟢 Green dot = launched successfully this session
-
-## Notes
-
-- **Safari only** — third-party browsers restrict custom URL scheme navigation even with user gestures
-- **App must be installed** — iOS silently fails if the target app isn't installed (no error in Safari)
-- **iOS 14+ behaviour differs** — some private schemes that work on iOS 13 were restricted in later versions
-- Schemes marked as hidden/private were extracted from iOS system files and may not work without specific entitlements
-
-## Sources
-
-- [Justin Meyers — Complete List of iOS URL Schemes (Medium)](https://medium.com/@contact.jmeyers)
-- [phynet/iOS-URL-Schemes (GitHub)](https://github.com/phynet/iOS-URL-Schemes)
-- [ChronSyn/BIG iOS URL SCHEME LIST (Gist)](https://gist.github.com/ChronSyn/dffdffc037bb62731f35fbbda7e8e440)
-- [bhagyas/app-urls (GitHub)](https://github.com/bhagyas/app-urls)
-- [Apple Developer Documentation](https://developer.apple.com/library/archive/featuredarticles/iPhoneURLScheme_Reference/)
-- [kairin/iphoneprefsurls (GitHub)](https://github.com/kairin/iphoneprefsurls)
-
-## File structure
-
-```
-ios-scheme-launcher/
-├── index.html      # Main page
-├── style.css       # Styles (dark mode, iOS-native feel)
-├── schemes.js      # All URL schemes data
-├── app.js          # Launch logic + UI rendering
-└── README.md       # This file
+```sh
+brew install make pkg-config libusb libimobiledevice libirecovery libusbmuxd \
+  libimobiledevice-glue libplist mbedtls readline xz xxd
 ```
 
-## Contributing
+This project uses GNU Make syntax. Homebrew installs it as `gmake` on macOS;
+use `make` instead if GNU Make is already your default. Build from the
+repository root:
 
-Found a scheme not in the list? Open a PR and add it to `schemes.js` with the correct category and flags.
+```sh
+gmake
+```
+
+The Makefile now:
+
+- works with Intel Homebrew (`/usr/local`) as well as Apple Silicon Homebrew;
+- does not invoke `brew` when it is absent;
+- obtains libusb's include and linker flags through `pkg-config`;
+- downloads only the host checkra1n payload that is needed; and
+- creates missing build directories automatically.
+
+Compilation does not require `sudo`. Install the resulting command with:
+
+```sh
+sudo gmake install
+```
+
+Use `PREFIX=/some/path` to install somewhere else. Run `gmake clean` to remove
+local build output and downloaded resources.
+
+## Usage
+
+1. Flash a supported usbliter8 RP2350 board and use it to put the device in
+   pwned DFU.
+2. Move the device back to the Mac/PC. Confirm that its DFU serial string ends
+   in `PWND:[usbliter8]`.
+3. Run the host tool with the usbliter8 mode enabled:
+
+```sh
+sudo palera1n --pwned-dfu -l -v
+```
+
+`--pwned-dfu` prevents the host from trying checkm8 on A12/A13-class devices.
+`-l` selects the rootless pipeline. `--override-pongo FILE` can be used to
+send a different raw Pongo/iBoot image; otherwise the embedded image is used.
+
+Useful diagnostics:
+
+```sh
+palera1n --version
+palera1n --diagnostics
+palera1n --device-info
+```
+
+This remains a tethered workflow: the device must be connected to the
+usbliter8 hardware again whenever the boot chain needs to be re-established.
+
+## Project layout
+
+- `src/usbliter8_boot.c` — safe libusb DFU download and boot request;
+- `src/device_support.c` — centralized CPID/device-path table;
+- `src/dfuhelper.c` — pwned DFU detection and routing;
+- `src/embedded_pongo_helper.c` — portable embedded-image extraction; and
+- `Makefile` — macOS/Linux dependency and resource build.
+
+## Credits
+
+- Paradigm Shift — usbliter8 research and exploit;
+- palera1n team — original jailbreak project; and
+- the contributors to libimobiledevice, libirecovery, libusb, and mbedTLS.
+
+Use this software only on devices you own or are authorized to test. A boot
+chain exploit does not bypass the Secure Enclave or device data encryption.
