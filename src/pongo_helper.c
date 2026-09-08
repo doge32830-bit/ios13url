@@ -28,9 +28,12 @@ static void write_stdout(char *buf, uint32_t len);
 void* pongo_helper(void* ptr) {
 	pongo_thr_running = 1;
 	pthread_cleanup_push(thr_cleanup, &pongo_thr_running);
-	wait_for_pongo();
-	while (get_spin()) {
-		sleep(1);
+	if (wait_for_pongo() != 0) {
+		set_spin(0);
+	} else {
+		while (get_spin()) {
+			sleep(1);
+		}
 	}
 	pthread_cleanup_pop(1);
 	return NULL;
@@ -142,9 +145,6 @@ done:
 		tui_jailbreak_status_changed();
 	}
 #endif
-#ifdef USE_LIBUSB
-	libusb_unref_device(arg->dev);
-#endif
 	set_spin(0);
 	return NULL;
 }
@@ -249,22 +249,19 @@ void io_start(stuff_t *stuff)
 void io_stop(stuff_t *stuff)
 {
     int r = pthread_cancel(stuff->th);
-    if(r != 0)
+    if(r != 0 && r != ESRCH)
     {
         ERR("pthread_cancel: %s", strerror(r));
         set_spin(0);
-		return;
     }
-    r = pthread_join(stuff->th, NULL);
-    if(r != 0)
-    {
-        ERR("pthread_join: %s", strerror(r));
-        set_spin(0);
-		return;
+    if (r == 0) {
+        r = pthread_join(stuff->th, NULL);
+        if(r != 0 && r != ESRCH)
+        {
+            ERR("pthread_join: %s", strerror(r));
+            set_spin(0);
+        }
     }
-#ifdef USE_LIBUSB
-	libusb_unref_device(stuff->dev);
-#endif
 }
 
 static void write_stdout(char *buf, uint32_t len)

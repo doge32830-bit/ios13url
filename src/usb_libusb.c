@@ -135,6 +135,7 @@ static int FoundDevice(libusb_context *ctx, libusb_device *dev, libusb_hotplug_e
     if(r != LIBUSB_SUCCESS && r != LIBUSB_ERROR_NOT_FOUND)
     {
         ERR("libusb_detach_kernel_driver: %s", libusb_error_name(r));
+        libusb_close(handle);
         return r;
     }
 #endif
@@ -143,6 +144,7 @@ static int FoundDevice(libusb_context *ctx, libusb_device *dev, libusb_hotplug_e
     if(r != LIBUSB_SUCCESS)
     {
         ERR("libusb_set_configuration: %s", libusb_error_name(r));
+        libusb_close(handle);
         return r;
     }
 
@@ -150,10 +152,12 @@ static int FoundDevice(libusb_context *ctx, libusb_device *dev, libusb_hotplug_e
     if(r != LIBUSB_SUCCESS)
     {
         ERR("libusb_claim_interface: %s", libusb_error_name(r));
+        libusb_close(handle);
         return r;
     }
 
-    stuff->dev = dev;
+    /* Keep the device alive after a hotplug callback returns. */
+    stuff->dev = libusb_ref_device(dev);
     stuff->handle = handle;
     io_start(stuff);
 
@@ -198,6 +202,14 @@ int wait_for_pongo(void)
         return -1;
     }
 
+    r = libusb_hotplug_register_callback(ctx, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, 0, PONGO_USB_VENDOR, PONGO_USB_PRODUCT, LIBUSB_HOTPLUG_MATCH_ANY, FoundDevice, &stuff, &hp[0]);
+    if(r != LIBUSB_SUCCESS)
+    {
+        ERR("libusb_hotplug: %s", libusb_error_name(r));
+        libusb_exit(ctx);
+        return -1;
+    }
+
     r = libusb_hotplug_register_callback(ctx, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT, 0, PONGO_USB_VENDOR, PONGO_USB_PRODUCT, LIBUSB_HOTPLUG_MATCH_ANY, LostDevice, &stuff, &hp[1]);
     if(r != LIBUSB_SUCCESS)
     {
@@ -213,6 +225,9 @@ int wait_for_pongo(void)
             ERR("libusb_handle_events: %s", libusb_error_name(r));
             break;
         }
+
+        if (stuff.handle)
+            goto end;
 
         libusb_device **list;
         ssize_t sz = libusb_get_device_list(ctx, &list);
@@ -260,6 +275,15 @@ int wait_for_pongo(void)
     }
 
     end:
+        if (stuff.handle) {
+            (void)libusb_release_interface(stuff.handle, 0);
+            libusb_close(stuff.handle);
+            stuff.handle = NULL;
+        }
+        if (stuff.dev) {
+            libusb_unref_device(stuff.dev);
+            stuff.dev = NULL;
+        }
         libusb_exit(ctx);
         return 0;
 }
