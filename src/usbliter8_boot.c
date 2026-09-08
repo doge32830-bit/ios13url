@@ -32,40 +32,52 @@
 
 static libusb_device_handle *open_usbliter8_device(libusb_context *ctx)
 {
-    libusb_device_handle *handle;
-    libusb_device *device;
-    struct libusb_device_descriptor desc;
-    unsigned char serial[256] = { 0 };
-    int ret;
+    libusb_device_handle *handle = NULL;
+    libusb_device **list = NULL;
+    ssize_t count;
+    ssize_t i;
 
-    handle = libusb_open_device_with_vid_pid(ctx, DFU_VID, DFU_PID);
-    if (!handle) {
-        fprintf(stderr, "error: no Apple DFU device found (%04x:%04x)\n",
-                DFU_VID, DFU_PID);
+    count = libusb_get_device_list(ctx, &list);
+    if (count < 0) {
+        fprintf(stderr, "error: could not enumerate USB devices: %s\n",
+                libusb_error_name((int)count));
         return NULL;
     }
 
-    (void)libusb_set_auto_detach_kernel_driver(handle, 1);
-    device = libusb_get_device(handle);
-    ret = libusb_get_device_descriptor(device, &desc);
-    if (ret == LIBUSB_SUCCESS && desc.iSerialNumber) {
-        ret = libusb_get_string_descriptor_ascii(handle, desc.iSerialNumber,
-                                                 serial, sizeof(serial) - 1);
-        if (ret < 0)
-            serial[0] = '\0';
+    for (i = 0; i < count; ++i) {
+        struct libusb_device_descriptor desc;
+        unsigned char serial[256] = { 0 };
+        int ret;
+
+        ret = libusb_get_device_descriptor(list[i], &desc);
+        if (ret != LIBUSB_SUCCESS || desc.idVendor != DFU_VID ||
+            desc.idProduct != DFU_PID)
+            continue;
+
+        ret = libusb_open(list[i], &handle);
+        if (ret != LIBUSB_SUCCESS)
+            continue;
+
+        (void)libusb_set_auto_detach_kernel_driver(handle, 1);
+        if (!desc.iSerialNumber ||
+            libusb_get_string_descriptor_ascii(handle, desc.iSerialNumber,
+                                               serial, sizeof(serial) - 1) < 0 ||
+            !strstr((const char *)serial, "PWND:[usbliter8]")) {
+            /* Never send a Pongo image to an ordinary or checkm8-pwned DFU
+             * device. Continue searching if another device is connected. */
+            libusb_close(handle);
+            handle = NULL;
+            continue;
+        }
+
+        printf("usbliter8: %s\n", serial);
+        libusb_free_device_list(list, 1);
+        return handle;
     }
 
-    /* Never send a Pongo image to an ordinary or checkm8-pwned DFU device. */
-    if (!strstr((const char *)serial, "PWND:[usbliter8]")) {
-        fprintf(stderr, "error: device is not in usbliter8 pwned DFU mode\n");
-        if (serial[0])
-            fprintf(stderr, "serial: %s\n", serial);
-        libusb_close(handle);
-        return NULL;
-    }
-
-    printf("usbliter8: %s\n", serial);
-    return handle;
+    libusb_free_device_list(list, 1);
+    fprintf(stderr, "error: no Apple DFU device marked PWND:[usbliter8] found\n");
+    return NULL;
 }
 
 static int download_image(libusb_device_handle *handle,
