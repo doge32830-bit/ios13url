@@ -21,7 +21,7 @@
 
 #define DFU_DNLOAD       1
 /* usbliter8's USB request handler uses CLR_STATUS (4) after boot. */
-#define DFU_ABORT        4
+#define DFU_CLR_STATUS   4
 #define CUSTOM_BOOT      8
 
 #define TRANSFER_SIZE    0x800u
@@ -162,7 +162,7 @@ int usbliter8_boot(const unsigned char *buf, size_t len)
 
     /* The reference tool sends this request after CUSTOM_BOOT.  It is normal
      * for it to fail because the device has already started rebooting. */
-    (void)libusb_control_transfer(handle, REQTYPE_CLASS_OUT, DFU_ABORT,
+    (void)libusb_control_transfer(handle, REQTYPE_CLASS_OUT, DFU_CLR_STATUS,
                                   0, 0, NULL, 0, CTRL_TIMEOUT_MS);
     printf("usbliter8: boot triggered\n");
 
